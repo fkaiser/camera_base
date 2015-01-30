@@ -39,7 +39,7 @@ class CameraRosBase {
         nh_(nh),
         cnh_(nh, prefix),
         it_(cnh_),
-        camera_pub_(it_.advertiseCamera("image_raw", 1)),
+        //        camera_pub_(it_.advertiseCamera("image_raw", 1)),
         cinfo_mgr_(cnh_, getParam<std::string>(cnh_, "camera_name"),
                    getParam<std::string>(cnh_, "calib_url")),
         topic_diagnostic_(
@@ -60,6 +60,11 @@ class CameraRosBase {
 
   double fps() const { return fps_; }
   void set_fps(double fps) { fps_ = fps; }
+
+  /**
+   * @brief Advertise Hack to delay initialization of CameraPublisher
+   */
+  void Advertise() { camera_pub_ = it_.advertiseCamera("image_raw", 1); }
 
   /**
    * @brief SetHardwareId Set hardware id for diagnostic updater
