@@ -33,11 +33,11 @@ T getParam(const ros::NodeHandle& nh, const std::string& name) {
  */
 class CameraRosBase {
  public:
-  explicit CameraRosBase(const ros::NodeHandle& nh,
+  explicit CameraRosBase(const ros::NodeHandle& pnh,
                          const std::string& prefix = std::string())
       : fps_(10),
-        nh_(nh),
-        cnh_(nh, prefix),
+        pnh_(pnh),
+        cnh_(pnh, prefix),
         it_(cnh_),
         //        camera_pub_(it_.advertiseCamera("image_raw", 1)),
         cinfo_mgr_(cnh_, getParam<std::string>(cnh_, "camera_name"),
@@ -46,7 +46,7 @@ class CameraRosBase {
             "image_raw", diagnostic_updater_,
             diagnostic_updater::FrequencyStatusParam(&fps_, &fps_, 0.1, 10),
             diagnostic_updater::TimeStampStatusParam(-0.01, 0.1)) {
-    nh_.param<std::string>("frame_id", frame_id_, "camera");
+    pnh_.param<std::string>("frame_id", frame_id_, "camera");
     cnh_.param<std::string>("identifier", identifier_, "");
   }
 
@@ -104,7 +104,7 @@ class CameraRosBase {
 
  private:
   double fps_;
-  ros::NodeHandle nh_;
+  ros::NodeHandle pnh_;
   ros::NodeHandle cnh_;
   image_transport::ImageTransport it_;
   image_transport::CameraPublisher camera_pub_;
