@@ -53,8 +53,11 @@ class CameraRosBase {
             diagnostic_updater::TimeStampStatusParam(-0.01, 0.1)) {
     pnh_.param<std::string>("frame_id", frame_id_, "camera");
     cnh_.param<std::string>("identifier", identifier_, "");
-    timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::TriggerCamera,this);
-    image_msg_buffer_.reserve(10);
+    //timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::TriggerCamera,this);
+    timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::BufferTimestamp,this);
+    image_msg_buffer_.reserve(100);
+    cinfo_msg_buffer_.reserve(100);
+    timestamp_buffer_.reserve(100);
 
   }
 
@@ -87,14 +90,7 @@ class CameraRosBase {
 
   }
 
-  void GrabandBufferImage(){
-	  if (Grab(image_msg_, cinfo_msg_)) {
-		  // cache image pointer in buffer
-		  image_msg_buffer_.push_back(image_msg_);
 
-	  }
-
-  }
 
   void TriggerCamera(const mavros_extras::CamIMUStamp& msg){
   ROS_INFO("I heard something %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
@@ -109,12 +105,48 @@ class CameraRosBase {
   		  camera_pub_.publish(image_msg_, cinfo_msg_);
   		  topic_diagnostic_.tick(image_msg_->header.stamp);
   	  }
+
+
+
   	  diagnostic_updater_.update();
-
-
 
   }
 
+  void BufferTimestamp(const mavros_extras::CamIMUStamp& msg){
+  //  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
+    timestamp_buffer_.push_back(msg.frame_stamp);
+  }
+
+  void GrabandBufferImage(){
+ 	  if (Grab(image_msg_, cinfo_msg_)) {
+ 		  // cache image pointer in buffer
+ 		  image_msg_buffer_.push_back(image_msg_);
+ 		 cinfo_msg_buffer_.push_back(cinfo_msg_);
+ 	  }
+
+   }
+  void StampandPublishImage() {
+
+	  // Check whether image with corresponding time stamp are buffered
+	  if (timestamp_buffer_.size()>0 && image_msg_buffer_.size()>0) {
+
+		  // Copy corresponing images and timestamps
+		  sensor_msgs::ImagePtr image_msg_topublish;
+		  sensor_msgs::CameraInfoPtr cinfo_msg_topublish;
+		  image_msg_topublish=image_msg_buffer_.at(0);
+		  cinfo_msg_topublish=cinfo_msg_buffer_.at(0);
+		  image_msg_topublish->header.stamp=timestamp_buffer_.at(0);
+		  cinfo_msg_topublish->header = image_msg_topublish->header;
+
+		  // Publish image in ROS
+		  	camera_pub_.publish(image_msg_topublish, cinfo_msg_topublish);
+
+		  // Erase published images and used timestamp from buffer
+		  image_msg_buffer_.erase(image_msg_buffer_.begin());
+		  cinfo_msg_buffer_.erase(cinfo_msg_buffer_.begin());
+		  timestamp_buffer_.erase(timestamp_buffer_.begin());
+	  }
+  }
 
   /**
    * @brief Grab Fill image_msg and cinfo_msg from low level camera driver
@@ -133,6 +165,8 @@ class CameraRosBase {
   camera_info_manager::CameraInfoManager cinfo_mgr_;
   sensor_msgs::ImagePtr image_msg_;
   std::vector<sensor_msgs::ImagePtr> image_msg_buffer_;
+  std::vector<sensor_msgs::CameraInfoPtr> cinfo_msg_buffer_;
+  std::vector<ros::Time> timestamp_buffer_;
   sensor_msgs::CameraInfoPtr cinfo_msg_;
   double fps_;
   diagnostic_updater::Updater diagnostic_updater_;
