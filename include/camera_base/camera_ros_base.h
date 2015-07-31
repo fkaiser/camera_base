@@ -10,7 +10,7 @@
 #include <diagnostic_updater/publisher.h>
 #include <diagnostic_updater/diagnostic_updater.h>
 #include <mavros_extras/CamIMUStamp.h>
-
+#include <vector>
 namespace camera_base {
 
 /**
@@ -54,6 +54,7 @@ class CameraRosBase {
     pnh_.param<std::string>("frame_id", frame_id_, "camera");
     cnh_.param<std::string>("identifier", identifier_, "");
     timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::TriggerCamera,this);
+    image_msg_buffer_.reserve(10);
 
   }
 
@@ -83,6 +84,15 @@ class CameraRosBase {
   void PublishCamera(const ros::Duration& time) {
 	      added2triggertime=time; // update additional time camera needs to update
 		  ros::spinOnce(); // Pumps timestamp of the triggering signal from ROS network into callback function TriggerCamera()
+
+  }
+
+  void GrabandBufferImage(){
+	  if (Grab(image_msg_, cinfo_msg_)) {
+		  // cache image pointer in buffer
+		  image_msg_buffer_.push_back(image_msg_);
+
+	  }
 
   }
 
@@ -122,6 +132,7 @@ class CameraRosBase {
   image_transport::CameraPublisher camera_pub_;
   camera_info_manager::CameraInfoManager cinfo_mgr_;
   sensor_msgs::ImagePtr image_msg_;
+  std::vector<sensor_msgs::ImagePtr> image_msg_buffer_;
   sensor_msgs::CameraInfoPtr cinfo_msg_;
   double fps_;
   diagnostic_updater::Updater diagnostic_updater_;
@@ -130,6 +141,7 @@ class CameraRosBase {
   std::string identifier_;
   ros::Subscriber timestamp_sub_;
   ros::Duration added2triggertime;
+
 };
 
 }  // namespace camera_base
