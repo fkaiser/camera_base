@@ -11,6 +11,7 @@
 #include <diagnostic_updater/diagnostic_updater.h>
 #include <mavros_extras/CamIMUStamp.h>
 #include <vector>
+#include <stdint.h>
 namespace camera_base {
 
 /**
@@ -57,7 +58,9 @@ class CameraRosBase {
     timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::BufferTimestamp,this);
     image_msg_buffer_.reserve(100);
     cinfo_msg_buffer_.reserve(100);
-    timestamp_buffer_.reserve(100);
+   // timestamp_buffer_.reserve(100);
+    timestamp_msg_buffer_.reserve(100);
+    frame_seq_id_=0;
 
   }
 
@@ -114,11 +117,15 @@ class CameraRosBase {
 
   void BufferTimestamp(const mavros_extras::CamIMUStamp& msg){
   //  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
-    timestamp_buffer_.push_back(msg.frame_stamp);
+    //timestamp_buffer_.push_back(msg.frame_stamp);
+    timestamp_msg_buffer_.push_back(msg);
+
   }
 
   void GrabandBufferImage(){
  	  if (Grab(image_msg_, cinfo_msg_)) {
+ 		 frame_seq_id_=frame_seq_id_+1;
+ 		  image_msg_->header.seq=frame_seq_id_;
  		  // cache image pointer in buffer
  		  image_msg_buffer_.push_back(image_msg_);
  		 cinfo_msg_buffer_.push_back(cinfo_msg_);
@@ -128,26 +135,67 @@ class CameraRosBase {
   void StampandPublishImage() {
 
 	  // Check whether image with corresponding time stamp are buffered
-	  if (timestamp_buffer_.size()>0 && image_msg_buffer_.size()>0) {
+	  int timestamp_indx=CheckandFind();
+	  //timestamp_indx=-1;
+	  if (timestamp_indx) {
 
-		  // Copy corresponing images and timestamps
+		  // Copy corresponding images and time stamps
 		  sensor_msgs::ImagePtr image_msg_topublish;
 		  sensor_msgs::CameraInfoPtr cinfo_msg_topublish;
 		  image_msg_topublish=image_msg_buffer_.at(0);
 		  cinfo_msg_topublish=cinfo_msg_buffer_.at(0);
-		  image_msg_topublish->header.stamp=timestamp_buffer_.at(0);
+		  image_msg_topublish->header.stamp=timestamp_msg_buffer_.at(timestamp_indx).frame_stamp;
 		  cinfo_msg_topublish->header = image_msg_topublish->header;
-
+		  ROS_INFO( "Published image with sequence %u",image_msg_topublish->header.seq);
 		  // Publish image in ROS
 		  	camera_pub_.publish(image_msg_topublish, cinfo_msg_topublish);
 
 		  // Erase published images and used timestamp from buffer
 		  image_msg_buffer_.erase(image_msg_buffer_.begin());
 		  cinfo_msg_buffer_.erase(cinfo_msg_buffer_.begin());
-		  timestamp_buffer_.erase(timestamp_buffer_.begin());
+		  timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin()+timestamp_indx);
+		  //timestamp_buffer_.erase(timestamp_buffer_.begin());
 	  }
   }
 
+
+  int CheckandFind() {
+		/* This function checks whether there are corresponding time stamps and and images in buffer
+		 * Assumptions:
+		 * 1) Trigger signal (electric pulse) by external source
+		 * 2) Image was taken by camera. (Placed object in result queue)
+		 * 3) Trigger time stamp message did not arrive here.
+		 * 4) Last time stamp message was in sync with last image retrieved from camera
+		 * */
+
+	  // Check whether there is at least one image in image buffer
+	  if(image_msg_buffer_.size()<1){
+		  return 0;
+	  }
+
+
+		// Check whether latest image in image buffer has corresponding element in time stamp buffer
+		uint k=0;
+		while(k<timestamp_msg_buffer_.size() && ros::ok()) {
+			if (image_msg_buffer_.at(0)->header.seq==(uint)timestamp_msg_buffer_.at(k).frame_seq_id) {
+				return k;
+			}
+			else
+			{
+
+				k=k+1;
+			}
+		}
+		return 0;
+	}
+
+	void PrintImageBuffer() {
+		uint k;
+		for(k=0;k<image_msg_buffer_.size();k++) {
+			ROS_INFO("Image with sequence %u still in buffer",image_msg_buffer_.at(k)->header.seq);
+
+		}
+	}
   /**
    * @brief Grab Fill image_msg and cinfo_msg from low level camera driver
    * @param image_msg Ros message ImagePtr
@@ -166,7 +214,8 @@ class CameraRosBase {
   sensor_msgs::ImagePtr image_msg_;
   std::vector<sensor_msgs::ImagePtr> image_msg_buffer_;
   std::vector<sensor_msgs::CameraInfoPtr> cinfo_msg_buffer_;
-  std::vector<ros::Time> timestamp_buffer_;
+ // std::vector<ros::Time> timestamp_buffer_;
+  std::vector<mavros_extras::CamIMUStamp> timestamp_msg_buffer_;
   sensor_msgs::CameraInfoPtr cinfo_msg_;
   double fps_;
   diagnostic_updater::Updater diagnostic_updater_;
@@ -175,6 +224,7 @@ class CameraRosBase {
   std::string identifier_;
   ros::Subscriber timestamp_sub_;
   ros::Duration added2triggertime;
+  uint32_t frame_seq_id_;
 
 };
 
