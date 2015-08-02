@@ -115,12 +115,29 @@ class CameraRosBase {
 
   }
 
-  void BufferTimestamp(const mavros_extras::CamIMUStamp& msg){
-  //  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
-    //timestamp_buffer_.push_back(msg.frame_stamp);
-    timestamp_msg_buffer_.push_back(msg);
+	void BufferTimestamp(const mavros_extras::CamIMUStamp& msg) {
+		//  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
+		//timestamp_buffer_.push_back(msg.frame_stamp);
+		timestamp_msg_buffer_.push_back(msg);
+// Check whether there is a time stamp message void between the last and the second last time stamp
+		auto buffersize=timestamp_msg_buffer_.size();
 
-  }
+		if(buffersize>1) {
+
+			auto n_void=timestamp_msg_buffer_.at(buffersize-1).frame_seq_id-timestamp_msg_buffer_.at(buffersize-2).frame_seq_id;
+			while(n_void>1 && ros::ok()){
+				stamp_interpolated_.frame_seq_id=timestamp_msg_buffer_.at(buffersize-2).frame_seq_id+1;
+				void_difference_=timestamp_msg_buffer_.at(buffersize-1).frame_stamp-timestamp_msg_buffer_.at(buffersize-2).frame_stamp;
+				stamp_interpolated_.frame_stamp=timestamp_msg_buffer_.at(buffersize-2).frame_stamp+ros::Duration(void_difference_.toSec()/n_void);
+				timestamp_msg_buffer_.insert(timestamp_msg_buffer_.end()-1,stamp_interpolated_);
+				buffersize=timestamp_msg_buffer_.size();
+				n_void=timestamp_msg_buffer_.at(buffersize-1).frame_seq_id-timestamp_msg_buffer_.at(buffersize-2).frame_seq_id;
+				ROS_INFO("Detected missing time stamp message. Create time stamp message with interpolation at %u.%u",stamp_interpolated_.frame_stamp.sec,stamp_interpolated_.frame_stamp.nsec);
+
+			}
+		}
+
+	}
 
   void GrabandBufferImage(){
  	  if (Grab(image_msg_, cinfo_msg_)) {
@@ -132,10 +149,10 @@ class CameraRosBase {
  	  }
 
    }
-  void StampandPublishImage() {
+  unsigned int StampandPublishImage(unsigned int bufferindx) {
 
 	  // Check whether image with corresponding time stamp are buffered
-	  int timestamp_indx=CheckandFind();
+	  int timestamp_indx=CheckandFind(bufferindx);
 	  //timestamp_indx=-1;
 	  if (timestamp_indx) {
 
@@ -146,7 +163,8 @@ class CameraRosBase {
 		  cinfo_msg_topublish=cinfo_msg_buffer_.at(0);
 		  image_msg_topublish->header.stamp=timestamp_msg_buffer_.at(timestamp_indx).frame_stamp;
 		  cinfo_msg_topublish->header = image_msg_topublish->header;
-		  ROS_INFO( "Published image with sequence %u",image_msg_topublish->header.seq);
+		  //ROS_INFO( "Published image with sequence %u",image_msg_topublish->header.seq);
+
 		  // Publish image in ROS
 		  	camera_pub_.publish(image_msg_topublish, cinfo_msg_topublish);
 
@@ -154,12 +172,32 @@ class CameraRosBase {
 		  image_msg_buffer_.erase(image_msg_buffer_.begin());
 		  cinfo_msg_buffer_.erase(cinfo_msg_buffer_.begin());
 		  timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin()+timestamp_indx);
+		  ROS_INFO("Number of elements in buffer left: %u",(unsigned int)image_msg_buffer_.size());
+		  return 0;
 		  //timestamp_buffer_.erase(timestamp_buffer_.begin());
+	  }
+	  else
+	  {
+		  return 1;
 	  }
   }
 
+  void PublishImagebuffer(){
 
-  int CheckandFind() {
+
+	  if  (image_msg_buffer_.size() && timestamp_msg_buffer_.size()){
+		  unsigned int i;
+		  for(i=0;i<image_msg_buffer_.size();)
+		  {
+			  i=i+StampandPublishImage(i);
+		  }
+
+	  }
+
+  }
+
+
+  unsigned int CheckandFind(unsigned int bufferindx) {
 		/* This function checks whether there are corresponding time stamps and and images in buffer
 		 * Assumptions:
 		 * 1) Trigger signal (electric pulse) by external source
@@ -174,15 +212,14 @@ class CameraRosBase {
 	  }
 
 
-		// Check whether latest image in image buffer has corresponding element in time stamp buffer
-		uint k=0;
+		// Check whether image in image buffer with index "bufferindex" has corresponding element in time stamp buffer
+		unsigned int k=0;
 		while(k<timestamp_msg_buffer_.size() && ros::ok()) {
-			if (image_msg_buffer_.at(0)->header.seq==(uint)timestamp_msg_buffer_.at(k).frame_seq_id) {
+			if (image_msg_buffer_.at(bufferindx)->header.seq==(uint)timestamp_msg_buffer_.at(k).frame_seq_id) {
 				return k;
 			}
 			else
 			{
-
 				k=k+1;
 			}
 		}
@@ -225,6 +262,8 @@ class CameraRosBase {
   ros::Subscriber timestamp_sub_;
   ros::Duration added2triggertime;
   uint32_t frame_seq_id_;
+  mavros_extras::CamIMUStamp stamp_interpolated_;
+  ros::Duration void_difference_;
 
 };
 
