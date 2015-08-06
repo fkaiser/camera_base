@@ -162,6 +162,7 @@ class CameraRosBase {
 	  // Check whether image with corresponding time stamp are buffered
 	  int timestamp_indx=CheckandFind(bufferindx);
 	  //timestamp_indx=-1;
+	  timestamp_indx=1;
 	  if (timestamp_indx) {
 
 		  // Copy corresponding images and time stamps
