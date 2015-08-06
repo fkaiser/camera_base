@@ -162,8 +162,8 @@ class CameraRosBase {
 	  // Check whether image with corresponding time stamp are buffered
 	  int timestamp_indx=CheckandFind(bufferindx);
 	  //timestamp_indx=-1;
-	  timestamp_indx=1;
-	  if (timestamp_indx) {
+	  timestamp_indx=0;
+	  if (!timestamp_indx) {
 
 		  // Copy corresponding images and time stamps
 		  sensor_msgs::ImagePtr image_msg_topublish;
