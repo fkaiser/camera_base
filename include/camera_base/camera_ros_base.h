@@ -146,9 +146,10 @@ class CameraRosBase {
 
 		}
 		 // Check whether buffer exceeds limit size and if so throw away oldest image
-		if(timestamp_msg_buffer_.size()>5){
-			timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin());
-		}
+		//if(timestamp_msg_buffer_.size()>5){
+			//timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin());
+		//}
+		ROS_INFO("Timestamp buffer: %u",timestamp_msg_buffer_.size());
 	}
 
   void GrabandBufferImage(){
@@ -160,9 +161,10 @@ class CameraRosBase {
  		 cinfo_msg_buffer_.push_back(cinfo_msg_);
 
  		 // Check whether buffer exceeds limit size and if so throw away oldest image
-if(image_msg_buffer_.size()>5){
-	image_msg_buffer_.erase(image_msg_buffer_.begin());
-}
+//if(image_msg_buffer_.size()>5){
+	//image_msg_buffer_.erase(image_msg_buffer_.begin());
+//}
+ 		ROS_INFO("Image buffer: %u",image_msg_buffer_.size());
  	  }
 
    }
