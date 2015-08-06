@@ -196,7 +196,7 @@ class CameraRosBase {
 
 	  if  (image_msg_buffer_.size() && timestamp_msg_buffer_.size()){
 		  unsigned int i;
-		  for(i=0;i<image_msg_buffer_.size();)
+		  for(i=0;i<image_msg_buffer_.size() && timestamp_msg_buffer_.size()>0;)
 		  {
 			  i=i+StampandPublishImage(i);
 		  }
