@@ -88,16 +88,20 @@ class CameraRosBase {
    * @param time Acquisition time stamp
    */
   void PublishCamera(const ros::Duration& time) {
-	      added2triggertime=time; // update additional time camera needs to update
+	      added2triggertime_=time; // update additional time camera needs to update
 		  ros::spinOnce(); // Pumps timestamp of the triggering signal from ROS network into callback function TriggerCamera()
 
   }
 
+  void UpdateAdded2triggertime(const ros::Duration& time)
+  {
+	  added2triggertime_=time;
+  }
 
 
   void TriggerCamera(const mavros_extras::CamIMUStamp& msg){
   ROS_INFO("I heard something %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
-  image_msg_->header.stamp = msg.frame_stamp+added2triggertime;
+  image_msg_->header.stamp = msg.frame_stamp;
 
   	  image_msg_->header.frame_id = frame_id_;
   	 // ROS_INFO("seconds: %u nanoseconds: %u",time.sec,time.nsec);
@@ -118,7 +122,11 @@ class CameraRosBase {
 	void BufferTimestamp(const mavros_extras::CamIMUStamp& msg) {
 		//  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
 		//timestamp_buffer_.push_back(msg.frame_stamp);
-		timestamp_msg_buffer_.push_back(msg);
+		// Add half of exposure time to triggering instance
+		mavros_extras::CamIMUStamp tmp=msg;
+		tmp.frame_stamp=tmp.frame_stamp+added2triggertime_;
+		timestamp_msg_buffer_.push_back(tmp);
+
 // Check whether there is a time stamp message void between the last and the second last time stamp
 		auto buffersize=timestamp_msg_buffer_.size();
 
@@ -167,7 +175,6 @@ class CameraRosBase {
 
 		  // Publish image in ROS
 		  	camera_pub_.publish(image_msg_topublish, cinfo_msg_topublish);
-
 		  // Erase published images and used timestamp from buffer
 		  image_msg_buffer_.erase(image_msg_buffer_.begin());
 		  cinfo_msg_buffer_.erase(cinfo_msg_buffer_.begin());
@@ -260,7 +267,7 @@ class CameraRosBase {
   std::string frame_id_;
   std::string identifier_;
   ros::Subscriber timestamp_sub_;
-  ros::Duration added2triggertime;
+  ros::Duration added2triggertime_;
   uint32_t frame_seq_id_;
   mavros_extras::CamIMUStamp stamp_interpolated_;
   ros::Duration void_difference_;
