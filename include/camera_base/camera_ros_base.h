@@ -143,8 +143,12 @@ class CameraRosBase {
 				ROS_INFO("Detected missing time stamp message. Create time stamp message with interpolation at %u.%u",stamp_interpolated_.frame_stamp.sec,stamp_interpolated_.frame_stamp.nsec);
 
 			}
-		}
 
+		}
+		 // Check whether buffer exceeds limit size and if so throw away oldest image
+		if(timestamp_msg_buffer_.size()>5){
+			timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin());
+		}
 	}
 
   void GrabandBufferImage(){
@@ -154,6 +158,11 @@ class CameraRosBase {
  		  // cache image pointer in buffer
  		  image_msg_buffer_.push_back(image_msg_);
  		 cinfo_msg_buffer_.push_back(cinfo_msg_);
+
+ 		 // Check whether buffer exceeds limit size and if so throw away oldest image
+if(image_msg_buffer_.size()>5){
+	image_msg_buffer_.erase(image_msg_buffer_.begin());
+}
  	  }
 
    }
