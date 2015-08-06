@@ -160,16 +160,17 @@ class CameraRosBase {
   unsigned int StampandPublishImage(unsigned int bufferindx) {
 
 	  // Check whether image with corresponding time stamp are buffered
-	  int timestamp_indx=CheckandFind(bufferindx);
+	  //int timestamp_indx=CheckandFind(bufferindx);
 	  //timestamp_indx=-1;
-	  timestamp_indx=0;
-	  if (!timestamp_indx) {
+	  bufferindx=0;
+	 int  timestamp_indx=0;
+	  if (true) {
 
 		  // Copy corresponding images and time stamps
 		  sensor_msgs::ImagePtr image_msg_topublish;
 		  sensor_msgs::CameraInfoPtr cinfo_msg_topublish;
-		  image_msg_topublish=image_msg_buffer_.at(0);
-		  cinfo_msg_topublish=cinfo_msg_buffer_.at(0);
+		  image_msg_topublish=image_msg_buffer_.at(bufferindx);
+		  cinfo_msg_topublish=cinfo_msg_buffer_.at(bufferindx);
 		  image_msg_topublish->header.stamp=timestamp_msg_buffer_.at(timestamp_indx).frame_stamp;
 		  cinfo_msg_topublish->header = image_msg_topublish->header;
 		  //ROS_INFO( "Published image with sequence %u",image_msg_topublish->header.seq);
@@ -177,8 +178,8 @@ class CameraRosBase {
 		  // Publish image in ROS
 		  	camera_pub_.publish(image_msg_topublish, cinfo_msg_topublish);
 		  // Erase published images and used timestamp from buffer
-		  image_msg_buffer_.erase(image_msg_buffer_.begin());
-		  cinfo_msg_buffer_.erase(cinfo_msg_buffer_.begin());
+		  image_msg_buffer_.erase(image_msg_buffer_.begin()+bufferindx);
+		  cinfo_msg_buffer_.erase(cinfo_msg_buffer_.begin()+bufferindx);
 		  timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin()+timestamp_indx);
 		  ROS_INFO("Number of elements in buffer left: %u",(unsigned int)image_msg_buffer_.size());
 		  return 0;
