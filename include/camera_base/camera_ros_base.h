@@ -130,7 +130,7 @@ class CameraRosBase {
 		//timestamp_buffer_.push_back(msg.frame_stamp);
 		// Add half of exposure time to triggering instance
 		mavros_extras::CamIMUStamp tmp=msg;
-		ROS_INFO("Time stamp in subscriber buffer:%u", tmp.frame_seq_id);
+		ROS_INFO("Trigger sequence %u at %lf", tmp.frame_seq_id,(double)tmp.frame_stamp.toSec());
 	//	tmp.frame_stamp=tmp.frame_stamp+added2triggertime_;
 //		timestamp_msg_buffer_.push_back(tmp);
 
