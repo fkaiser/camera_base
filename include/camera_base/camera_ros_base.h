@@ -278,6 +278,13 @@ class CameraRosBase {
 
 	}
 
+	void CallCallbackOnce(){
+		ros_base_queue_.callOne();
+	}
+
+	void CallCallbackBuffer(){
+		ros_base_queue_.callAvailable();
+	}
 
   /**
    * @brief Grab Fill image_msg and cinfo_msg from low level camera driver
