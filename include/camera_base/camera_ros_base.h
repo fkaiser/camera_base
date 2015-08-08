@@ -12,6 +12,8 @@
 #include <mavros_extras/CamIMUStamp.h>
 #include <vector>
 #include <stdint.h>
+#include <std_srvs/Trigger.h>
+#include <ros/callback_queue.h>
 namespace camera_base {
 
 /**
@@ -52,15 +54,19 @@ class CameraRosBase {
             diagnostic_updater_,
             diagnostic_updater::FrequencyStatusParam(&fps_, &fps_, 0.1, 10),
             diagnostic_updater::TimeStampStatusParam(-0.01, 0.1)) {
+	  cnh_.setCallbackQueue(&ros_base_queue_);
     pnh_.param<std::string>("frame_id", frame_id_, "camera");
     cnh_.param<std::string>("identifier", identifier_, "");
     //timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::TriggerCamera,this);
-    timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::BufferTimestamp,this);
+    timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 10, &CameraRosBase::BufferTimestamp,this);
     image_msg_buffer_.reserve(100);
     cinfo_msg_buffer_.reserve(100);
    // timestamp_buffer_.reserve(100);
     timestamp_msg_buffer_.reserve(100);
     frame_seq_id_=0;
+    ros::param::get("~starttopic",starttigrertopic_name_);
+    client_cam_=cnh_.serviceClient<std_srvs::Trigger>(starttigrertopic_name_);
+
 
   }
 
@@ -89,7 +95,7 @@ class CameraRosBase {
    */
   void PublishCamera(const ros::Duration& time) {
 	      added2triggertime_=time; // update additional time camera needs to update
-		  ros::spinOnce(); // Pumps timestamp of the triggering signal from ROS network into callback function TriggerCamera()
+		  //ros::spinOnce(); // Pumps timestamp of the triggering signal from ROS network into callback function TriggerCamera()
 
   }
 
@@ -124,32 +130,34 @@ class CameraRosBase {
 		//timestamp_buffer_.push_back(msg.frame_stamp);
 		// Add half of exposure time to triggering instance
 		mavros_extras::CamIMUStamp tmp=msg;
-		tmp.frame_stamp=tmp.frame_stamp+added2triggertime_;
-		timestamp_msg_buffer_.push_back(tmp);
+		ROS_INFO("Time stamp in subscriber buffer:%u", tmp.frame_seq_id);
+	//	tmp.frame_stamp=tmp.frame_stamp+added2triggertime_;
+//		timestamp_msg_buffer_.push_back(tmp);
+
 
 // Check whether there is a time stamp message void between the last and the second last time stamp
-		auto buffersize=timestamp_msg_buffer_.size();
-
-		if(buffersize>1) {
-
-			auto n_void=timestamp_msg_buffer_.at(buffersize-1).frame_seq_id-timestamp_msg_buffer_.at(buffersize-2).frame_seq_id;
-			while(n_void>1 && ros::ok()){
-				stamp_interpolated_.frame_seq_id=timestamp_msg_buffer_.at(buffersize-2).frame_seq_id+1;
-				void_difference_=timestamp_msg_buffer_.at(buffersize-1).frame_stamp-timestamp_msg_buffer_.at(buffersize-2).frame_stamp;
-				stamp_interpolated_.frame_stamp=timestamp_msg_buffer_.at(buffersize-2).frame_stamp+ros::Duration(void_difference_.toSec()/n_void);
-				timestamp_msg_buffer_.insert(timestamp_msg_buffer_.end()-1,stamp_interpolated_);
-				buffersize=timestamp_msg_buffer_.size();
-				n_void=timestamp_msg_buffer_.at(buffersize-1).frame_seq_id-timestamp_msg_buffer_.at(buffersize-2).frame_seq_id;
-				ROS_INFO("Detected missing time stamp message. Create time stamp message with interpolation at %u.%u",stamp_interpolated_.frame_stamp.sec,stamp_interpolated_.frame_stamp.nsec);
-
-			}
-
-		}
+//		auto buffersize=timestamp_msg_buffer_.size();
+//
+//		if(buffersize>1) {
+//
+//			auto n_void=timestamp_msg_buffer_.at(buffersize-1).frame_seq_id-timestamp_msg_buffer_.at(buffersize-2).frame_seq_id;
+//			while(n_void>1 && ros::ok()){
+//				stamp_interpolated_.frame_seq_id=timestamp_msg_buffer_.at(buffersize-2).frame_seq_id+1;
+//				void_difference_=timestamp_msg_buffer_.at(buffersize-1).frame_stamp-timestamp_msg_buffer_.at(buffersize-2).frame_stamp;
+//				stamp_interpolated_.frame_stamp=timestamp_msg_buffer_.at(buffersize-2).frame_stamp+ros::Duration(void_difference_.toSec()/n_void);
+//				timestamp_msg_buffer_.insert(timestamp_msg_buffer_.end()-1,stamp_interpolated_);
+//				buffersize=timestamp_msg_buffer_.size();
+//				n_void=timestamp_msg_buffer_.at(buffersize-1).frame_seq_id-timestamp_msg_buffer_.at(buffersize-2).frame_seq_id;
+//				ROS_INFO("Detected missing time stamp message. Create time stamp message with interpolation at %u.%u",stamp_interpolated_.frame_stamp.sec,stamp_interpolated_.frame_stamp.nsec);
+//
+//			}
+//
+//		}
 		 // Check whether buffer exceeds limit size and if so throw away oldest image
 		//if(timestamp_msg_buffer_.size()>5){
 			//timestamp_msg_buffer_.erase(timestamp_msg_buffer_.begin());
 		//}
-		ROS_INFO("Timestamp buffer: %u",timestamp_msg_buffer_.size());
+	//	ROS_INFO("Timestamp buffer: %u",timestamp_msg_buffer_.size());
 	}
 
   void GrabandBufferImage(){
@@ -164,10 +172,11 @@ class CameraRosBase {
 //if(image_msg_buffer_.size()>5){
 	//image_msg_buffer_.erase(image_msg_buffer_.begin());
 //}
- 		ROS_INFO("Image buffer: %u",image_msg_buffer_.size());
+ 		//ROS_INFO("Timestamp buffer: %u",timestamp_msg_buffer_.size());
  	  }
 
    }
+
   unsigned int StampandPublishImage(unsigned int bufferindx) {
 
 	  // Check whether image with corresponding time stamp are buffered
@@ -253,6 +262,23 @@ class CameraRosBase {
 
 		}
 	}
+
+	bool SendReadyforTrigger(){
+		if (client_cam_.call(srv_cam_))
+		{
+			ROS_INFO_STREAM("Camera "<<getParam<std::string>(cnh_, "camera_name")<<" could successfully call ready-for-trigger signal service.");
+			return true;
+		}
+		else
+		{
+			ROS_ERROR_STREAM("Camera "<<getParam<std::string>(cnh_, "camera_name")<<" could not call ready-for-trigger signal service.");
+			return false;
+
+		}
+
+	}
+
+
   /**
    * @brief Grab Fill image_msg and cinfo_msg from low level camera driver
    * @param image_msg Ros message ImagePtr
@@ -268,6 +294,8 @@ class CameraRosBase {
   image_transport::ImageTransport it_;
   image_transport::CameraPublisher camera_pub_;
   camera_info_manager::CameraInfoManager cinfo_mgr_;
+  ros::ServiceClient client_cam_;
+  std_srvs::Trigger srv_cam_;
   sensor_msgs::ImagePtr image_msg_;
   std::vector<sensor_msgs::ImagePtr> image_msg_buffer_;
   std::vector<sensor_msgs::CameraInfoPtr> cinfo_msg_buffer_;
@@ -284,7 +312,8 @@ class CameraRosBase {
   uint32_t frame_seq_id_;
   mavros_extras::CamIMUStamp stamp_interpolated_;
   ros::Duration void_difference_;
-
+  std::string starttigrertopic_name_;
+  ros::CallbackQueue ros_base_queue_;
 };
 
 }  // namespace camera_base
