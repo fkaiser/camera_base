@@ -125,6 +125,7 @@ class CameraRosBase {
 
   }
 
+
 	void BufferTimestamp(const mavros_extras::CamIMUStamp& msg) {
 		//  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
 		//timestamp_buffer_.push_back(msg.frame_stamp);
