@@ -58,7 +58,7 @@ class CameraRosBase {
     pnh_.param<std::string>("frame_id", frame_id_, "camera");
     cnh_.param<std::string>("identifier", identifier_, "");
     //timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1000, &CameraRosBase::TriggerCamera,this);
-    timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 10, &CameraRosBase::BufferTimestamp,this);
+    timestamp_sub_ = cnh_.subscribe("/mavros/cam_imu_sync/cam_imu_stamp", 1, &CameraRosBase::BufferTimestamp,this);
     image_msg_buffer_.reserve(100);
     cinfo_msg_buffer_.reserve(100);
    // timestamp_buffer_.reserve(100);
@@ -125,6 +125,16 @@ class CameraRosBase {
 
   }
 
+  void PublishImage(const mavros_extras::CamIMUStamp& msg)
+  {
+	  // Time stamp image that was grabbed
+	  image_msg_->header.stamp=msg.frame_stamp;
+	  cinfo_msg_->header=image_msg_->header;
+
+	 // Publish image in ROS
+	  camera_pub_.publish(image_msg_, cinfo_msg_);
+  }
+
 
 	void BufferTimestamp(const mavros_extras::CamIMUStamp& msg) {
 		//  ROS_INFO("Buffered timestamp %u.%u",msg.frame_stamp.sec,msg.frame_stamp.nsec);
@@ -132,8 +142,10 @@ class CameraRosBase {
 		// Add half of exposure time to triggering instance
 		mavros_extras::CamIMUStamp tmp=msg;
 		ROS_INFO("Trigger sequence %u at %lf", tmp.frame_seq_id,(double)tmp.frame_stamp.toSec());
+		PublishImage(msg);
+		//timestamp_msg_buffer_.push_back(tmp);
 	//	tmp.frame_stamp=tmp.frame_stamp+added2triggertime_;
-//		timestamp_msg_buffer_.push_back(tmp);
+
 
 
 // Check whether there is a time stamp message void between the last and the second last time stamp
@@ -177,6 +189,10 @@ class CameraRosBase {
  	  }
 
    }
+
+bool GraboneImage(){
+	return Grab(image_msg_,cinfo_msg_);
+}
 
   unsigned int StampandPublishImage(unsigned int bufferindx) {
 
@@ -286,6 +302,7 @@ class CameraRosBase {
 	void CallCallbackBuffer(){
 		ros_base_queue_.callAvailable();
 	}
+
 
   /**
    * @brief Grab Fill image_msg and cinfo_msg from low level camera driver
