@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
     dynamic_reconfigure
     image_transport
     sensor_msgs
+    std_srvs
     )
 
 catkin_package(
