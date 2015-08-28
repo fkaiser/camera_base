@@ -68,6 +68,7 @@ class CameraRosBase {
     client_cam_=cnh_.serviceClient<std_srvs::Trigger>(starttigrertopic_name_);
 
 
+
   }
 
   CameraRosBase() = delete;
@@ -141,7 +142,7 @@ class CameraRosBase {
 		//timestamp_buffer_.push_back(msg.frame_stamp);
 		// Add half of exposure time to triggering instance
 		mavros_extras::CamIMUStamp tmp=msg;
-		ROS_INFO("Trigger sequence %u at %lf", tmp.frame_seq_id,(double)tmp.frame_stamp.toSec());
+		//ROS_INFO("Trigger sequence %u at %lf", tmp.frame_seq_id,(double)tmp.frame_stamp.toSec());
 		PublishImage(msg);
 		//timestamp_msg_buffer_.push_back(tmp);
 	//	tmp.frame_stamp=tmp.frame_stamp+added2triggertime_;
@@ -299,6 +300,10 @@ bool GraboneImage(){
 		ros_base_queue_.callOne();
 	}
 
+	void UpdateAddtime(ros::Duration add_time){
+		timestamp_add_=add_time;
+		}
+
 	void CallCallbackBuffer(){
 		ros_base_queue_.callAvailable();
 	}
@@ -337,8 +342,10 @@ bool GraboneImage(){
   uint32_t frame_seq_id_;
   mavros_extras::CamIMUStamp stamp_interpolated_;
   ros::Duration void_difference_;
+  ros::Duration timestamp_add_;
   std::string starttigrertopic_name_;
   ros::CallbackQueue ros_base_queue_;
+
 };
 
 }  // namespace camera_base
