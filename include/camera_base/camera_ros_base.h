@@ -130,6 +130,8 @@ class CameraRosBase {
   {
 	  // Time stamp image that was grabbed
 	  image_msg_->header.stamp=msg.frame_stamp;
+	  image_msg_->header.stamp=image_msg_->header.stamp+timestamp_add_;
+	 // ROS_INFO_STREAM(timestamp_add_.toSec());
 	  cinfo_msg_->header=image_msg_->header;
 
 	 // Publish image in ROS
